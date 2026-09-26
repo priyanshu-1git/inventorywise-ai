@@ -8,7 +8,7 @@ import os
 BASE_DIR = os.path.dirname(__file__)
 
 st.set_page_config(
-    page_title="WasteWise AI",
+    page_title="InventoryWise AI",
     page_icon="♻️",
     layout="wide"
 )
@@ -220,12 +220,11 @@ h1, h2, h3 {
 # HEADER
 # =========================================================
 
-st.title("♻️ WasteWise AI")
+st.title("♻️ InventoryWise AI")
 
 st.subheader(
-    "AI-Powered Perishable Inventory Waste Prevention"
+    "AI-Powered Perishable Inventory Waste Prevention System"
 )
-
 st.write(
     "Demand forecasting + shelf-life analysis + "
     "explainable intervention support"
