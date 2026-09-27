@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InventoryWise AI — Perishable Waste Prevention</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2220%22 font-size=%2220%22>♻️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+
+/* =====================================================
+   DESIGN TOKENS
+===================================================== */
+:root{
+  --bg:#0a1512;
+  --bg-alt:#0d1a16;
+  --surface:#11201c;
+  --surface-raised:#152922;
+  --hairline:#20342c;
+  --hairline-soft:#182821;
+  --text:#eef4f1;
+  --text-dim:#9db3a9;
+  --text-faint:#5c7268;
+
+  --accent:#4fbf8b;       /* sustainability / primary action */
+  --accent-dim:#376b52;
+  --accent-soft:rgba(79,191,139,.12);
+  --intel:#63a9d6;        /* AI / forecast / data */
+  --intel-soft:rgba(99,169,214,.12);
+
+  --risk-none:#4fbf8b;
+  --risk-low:#63a9d6;
+  --risk-medium:#d9b64e;
+  --risk-high:#e0913f;
+  --risk-critical:#e8566b;
+
+  --radius:10px;
+  --radius-sm:6px;
+  --font-display:"Space Grotesk",Inter,sans-serif;
+  --font-body:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,monospace;
+}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms !important;transition-duration:.001ms !important;}
+}
+
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;scroll-padding-top:76px;}
+body{
+  margin:0;
+  background:
+    radial-gradient(ellipse 1100px 500px at 15% -10%, rgba(79,191,139,.08), transparent 60%),
+    radial-gradient(ellipse 900px 500px at 100% 0%, rgba(99,169,214,.06), transparent 55%),
+    var(--bg);
+  color:var(--text);
+  font-family:var(--font-body);
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--intel);}
+::selection{background:var(--accent-soft);color:var(--text);}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px;}
+
+.container{width:min(1320px,92%);margin:auto;}
+
+/* progress bar */
+#progressBar{
+  position:fixed;top:0;left:0;height:2px;width:0%;
+  background:linear-gradient(90deg,var(--accent),var(--intel));
+  z-index:200;transition:width .35s ease,opacity .4s ease;
+}
+
+/* =====================================================
+   NAV
+===================================================== */
+.topbar{
+  position:sticky;top:0;z-index:100;
+  background:rgba(10,21,18,.86);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--hairline);
+}
+.topbar-inner{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:20px;padding:13px 0;
+}
+.brand-mini{display:flex;align-items:center;gap:9px;font-family:var(--font-display);font-weight:600;font-size:15px;white-space:nowrap;}
+.brand-mini .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:0 0 7px;}
+.navlinks{
+  display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;
+}
+.navlinks::-webkit-scrollbar{display:none;}
+.navlinks a{
+  color:var(--text-dim);text-decoration:none;font-size:13px;
+  padding:7px 12px;border-radius:20px;white-space:nowrap;
+  transition:color .15s ease,background .15s ease;
+}
+.navlinks a:hover{color:var(--text);background:var(--surface);}
+.navlinks a.active{color:var(--bg);background:var(--accent);font-weight:600;}
+.status-pill{
+  display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-dim);
+  padding:6px 11px;border:1px solid var(--hairline);border-radius:20px;white-space:nowrap;
+}
+.status-pill .led{width:7px;height:7px;border-radius:50%;background:var(--text-faint);transition:background .3s ease;}
+.status-pill.online .led{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+.status-pill.offline .led{background:var(--risk-critical);box-shadow:0 0 0 3px rgba(232,86,107,.15);}
+
+/* =====================================================
+   HEADER
+===================================================== */
+header.hero{padding:46px 0 30px;}
+.brand{display:flex;align-items:flex-start;gap:16px;}
+.brand-icon{font-size:34px;line-height:1;flex:0 0 auto;margin-top:2px;}
+.brand h1{
+  margin:0;font-family:var(--font-display);font-size:clamp(26px,3.4vw,34px);
+  font-weight:600;letter-spacing:-.02em;
+}
+.hero .subtitle{margin-top:8px;font-size:15.5px;color:var(--text-dim);max-width:640px;font-weight:500;}
+.hero .tagline{margin-top:6px;font-size:13.5px;color:var(--text-faint);}
+
+/* =====================================================
+   LEDGER STRIP (KPIs + product metrics)
+===================================================== */
+.ledger{
+  display:grid;grid-template-columns:repeat(5,1fr);
+  border:1px solid var(--hairline);border-radius:var(--radius);
+  background:var(--surface);overflow:hidden;
+}
+.ledger-cell{
+  padding:18px 20px;border-left:1px solid var(--hairline);position:relative;
+}
+.ledger-cell:first-child{border-left:none;}
+.ledger-cell .l-label{font-size:12.5px;color:var(--text-dim);}
+.ledger-cell .l-value{
+  margin-top:9px;font-family:var(--font-display);font-size:26px;font-weight:600;
+  display:flex;align-items:baseline;gap:5px;
+}
+.ledger-cell .l-value .unit{font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text-faint);}
+.ledger-cell.accent-critical .l-value{color:var(--risk-critical);}
+.ledger-cell.accent-good .l-value{color:var(--accent);}
+
+/* =====================================================
+   SECTIONS
+===================================================== */
+.section{border-top:1px solid var(--hairline);padding:44px 0;scroll-margin-top:76px;}
+.section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap;}
+.section-title{
+  display:flex;align-items:center;gap:11px;
+  font-family:var(--font-display);font-size:20px;font-weight:600;margin:0;
+}
+.section-icon{font-size:21px;line-height:1;flex:0 0 auto;}
+.section-description{color:var(--text-dim);font-size:13.5px;margin:-14px 0 20px;max-width:620px;}
+
+.panel{
+  background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);padding:20px;
+}
+.panel-title{font-size:14px;font-weight:600;margin-bottom:2px;}
+.panel-subtitle{color:var(--text-faint);font-size:11.5px;margin-bottom:14px;}
+
+/* =====================================================
+   RISK LEGEND
+===================================================== */
+.risk-legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;font-size:12px;color:var(--text-dim);}
+.risk-legend span{display:inline-flex;align-items:center;gap:6px;}
+.risk-legend i{width:8px;height:8px;border-radius:2px;display:inline-block;}
+
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.chart{width:100%;height:300px;}
+
+/* =====================================================
+   FILTER CHIPS
+===================================================== */
+.chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+.chip{
+  border:1px solid var(--hairline);background:var(--surface);color:var(--text-dim);
+  font-size:12.5px;padding:7px 13px;border-radius:20px;cursor:pointer;
+  transition:border-color .15s ease,color .15s ease,background .15s ease;
+  font-family:var(--font-body);
+}
+.chip:hover{color:var(--text);border-color:var(--accent-dim);}
+.chip.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600;}
+.chip .count{opacity:.7;margin-left:5px;}
+
+/* quick-pick sku chips */
+.sku-chip{
+  border:1px solid var(--hairline);background:var(--surface-raised);color:var(--text-dim);
+  font-family:var(--font-mono);font-size:11.5px;padding:6px 10px;border-radius:var(--radius-sm);
+  cursor:pointer;transition:border-color .15s ease,color .15s ease;
+}
+.sku-chip:hover{color:var(--text);border-color:var(--intel);}
+.sku-chip.active{border-color:var(--intel);color:var(--intel);background:var(--intel-soft);}
+
+/* =====================================================
+   ACTION CENTER
+===================================================== */
+#actionCenter{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.action-card{
+  border-radius:var(--radius);padding:18px;border:1px solid var(--hairline);
+  background:var(--surface);border-left:3px solid var(--hairline);
+}
+.action-card.critical{border-left-color:var(--risk-critical);}
+.action-card.high{border-left-color:var(--risk-high);}
+.action-card.medium{border-left-color:var(--risk-medium);}
+.action-card.low{border-left-color:var(--risk-low);}
+.action-title{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-size:13.5px;font-weight:600;margin-bottom:15px;
+}
+.action-title .sku-code{font-family:var(--font-mono);color:var(--text-dim);font-weight:500;font-size:12px;}
+.risk-badge{
+  font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:20px;
+  text-transform:capitalize;white-space:nowrap;
+}
+.risk-badge.critical{color:var(--risk-critical);background:rgba(232,86,107,.13);}
+.risk-badge.high{color:var(--risk-high);background:rgba(224,145,63,.13);}
+.risk-badge.medium{color:var(--risk-medium);background:rgba(217,182,78,.13);}
+.risk-badge.low{color:var(--risk-low);background:rgba(99,169,214,.13);}
+.risk-badge.none{color:var(--risk-none);background:rgba(79,191,139,.13);}
+.action-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.action-metric-label{font-size:10px;color:var(--text-faint);}
+.action-metric-value{margin-top:4px;font-family:var(--font-display);font-size:17px;font-weight:600;}
+.action-recommendation{
+  margin-top:14px;padding-top:13px;border-top:1px solid var(--hairline-soft);
+  color:var(--text-dim);font-size:12.5px;line-height:1.55;
+}
+.empty-state,.error-state{
+  grid-column:1/-1;padding:34px 20px;text-align:center;color:var(--text-faint);
+  border:1px dashed var(--hairline);border-radius:var(--radius);font-size:13px;
+}
+.error-state{color:var(--risk-critical);border-color:rgba(232,86,107,.3);background:rgba(232,86,107,.05);}
+
+/* =====================================================
+   FORMS
+===================================================== */
+label{font-size:11.5px;color:var(--text-dim);display:block;margin-bottom:7px;}
+select,input[type=text]{
+  width:100%;border-radius:var(--radius-sm);border:1px solid var(--hairline);
+  background:var(--bg-alt);color:var(--text);padding:11px 12px;font-size:13px;
+  font-family:var(--font-body);transition:border-color .15s ease;
+}
+select:focus,input[type=text]:focus{outline:none;border-color:var(--intel);}
+button{
+  cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--accent-dim);
+  background:var(--accent-soft);color:var(--accent);padding:11px 18px;font-size:13px;
+  font-weight:600;font-family:var(--font-body);transition:background .15s ease,border-color .15s ease;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;
+}
+button:hover:not(:disabled){background:rgba(79,191,139,.2);border-color:var(--accent);}
+button:disabled{opacity:.55;cursor:progress;}
+.spinner{
+  width:13px;height:13px;border-radius:50%;border:2px solid rgba(79,191,139,.35);
+  border-top-color:var(--accent);animation:spin .7s linear infinite;display:none;
+}
+button.loading .spinner{display:inline-block;}
+button.needs-refresh{
+  border-color:var(--intel);
+  background:var(--intel-soft);
+  color:var(--intel);
+  box-shadow:0 0 0 1px rgba(99,169,214,.08);
+}
+button.needs-refresh:hover:not(:disabled){
+  background:rgba(99,169,214,.18);
+  border-color:var(--intel);
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* toggle switch */
+.switch-row{display:flex;align-items:center;gap:10px;}
+.switch{position:relative;width:38px;height:21px;flex:0 0 38px;}
+.switch input{opacity:0;width:0;height:0;}
+.switch .track{
+  position:absolute;inset:0;background:var(--bg-alt);border:1px solid var(--hairline);
+  border-radius:20px;transition:background .18s ease,border-color .18s ease;cursor:pointer;
+}
+.switch .track::before{
+  content:"";position:absolute;width:14px;height:14px;left:2px;top:2px;border-radius:50%;
+  background:var(--text-faint);transition:transform .18s ease,background .18s ease;
+}
+.switch input:checked + .track{background:var(--intel-soft);border-color:var(--intel);}
+.switch input:checked + .track::before{transform:translateX(17px);background:var(--intel);}
+
+/* =====================================================
+   PRODUCT ANALYSIS
+===================================================== */
+.select-row{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:18px;}
+.product-metrics{margin-top:18px;}
+.metric-box .l-label{color:var(--text-faint);}
+.risk-value{font-weight:600;}
+.risk-value.risk-critical{color:var(--risk-critical);}
+.risk-value.risk-high{color:var(--risk-high);}
+.risk-value.risk-medium{color:var(--risk-medium);}
+.risk-value.risk-low{color:var(--risk-low);}
+.risk-value.risk-none{color:var(--risk-none);}
+
+/* =====================================================
+   FORECAST
+===================================================== */
+.forecast-controls{display:grid;grid-template-columns:1.4fr 1fr auto auto;gap:12px;align-items:end;}
+.forecast-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px;}
+.forecast-stat{
+  background:var(--surface-raised);border:1px solid var(--hairline);border-radius:var(--radius-sm);padding:14px 15px;
+}
+.forecast-stat-label{color:var(--text-faint);font-size:10.5px;}
+.forecast-stat-value{margin-top:5px;font-family:var(--font-display);font-size:20px;font-weight:600;}
+#forecastChart{
+  height:340px;
+  margin-top:20px;
+  transition:opacity .2s ease,filter .2s ease,box-shadow .2s ease;
+}
+#forecastChart.forecast-stale{
+  opacity:.46;
+  filter:saturate(.55);
+  box-shadow:inset 0 0 0 1px rgba(99,169,214,.18);
+}
+.forecast-status{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:0;
+  margin-top:12px;
+  padding:0;
+  color:var(--text-faint);
+  font-size:11.5px;
+  transition:color .2s ease,background .2s ease,border-color .2s ease;
+}
+.forecast-status .status-dot{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--accent);
+  flex:0 0 7px;
+}
+.forecast-status.stale{
+  color:var(--intel);
+  background:var(--intel-soft);
+  border:1px solid rgba(99,169,214,.22);
+  border-radius:var(--radius-sm);
+  padding:8px 10px;
+}
+.forecast-status.stale .status-dot{
+  background:var(--intel);
+  box-shadow:0 0 0 3px rgba(99,169,214,.10);
+}
+.model-note{color:var(--text-faint);font-size:11.5px;margin-top:10px;line-height:1.6;}
+
+/* skeleton */
+.skeleton{
+  position:relative;overflow:hidden;background:var(--surface-raised);border-radius:var(--radius-sm);
+}
+.skeleton::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.05),transparent);
+  animation:shimmer 1.3s infinite;
+}
+@keyframes shimmer{from{transform:translateX(-100%);}to{transform:translateX(100%);}}
+
+/* =====================================================
+   TABLE
+===================================================== */
+.table-toolbar{display:flex;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+.table-toolbar input{max-width:260px;}
+.table-wrapper{overflow-x:auto;border:1px solid var(--hairline);border-radius:var(--radius-sm);}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:920px;}
+th{
+  text-align:left;color:var(--text-dim);font-weight:600;background:var(--surface-raised);
+  cursor:pointer;user-select:none;position:sticky;top:0;
+}
+th:hover{color:var(--text);}
+th .arrow{opacity:.4;margin-left:4px;font-size:10px;}
+th,td{padding:11px 12px;border-bottom:1px solid var(--hairline);white-space:nowrap;}
+tbody tr:hover{background:var(--surface-raised);}
+td{color:#c7d3cd;}
+td.sku-code{font-family:var(--font-mono);color:var(--text-dim);}
+
+/* =====================================================
+   DECISION LOGIC — vertical timeline (genuinely sequential)
+===================================================== */
+.timeline{border:1px solid var(--hairline);border-radius:var(--radius);background:var(--surface);padding:6px 22px;}
+.timeline-step{
+  display:flex;gap:16px;padding:16px 0;border-bottom:1px solid var(--hairline-soft);
+}
+.timeline-step:last-child{border-bottom:none;}
+.timeline-num{
+  flex:0 0 26px;height:26px;border-radius:50%;background:var(--intel-soft);color:var(--intel);
+  display:flex;align-items:center;justify-content:center;font-family:var(--font-display);
+  font-size:12px;font-weight:600;margin-top:1px;
+}
+.timeline-body h3{margin:0 0 4px;font-size:13.5px;font-weight:600;}
+.timeline-body p{margin:0;color:var(--text-dim);font-size:12.5px;line-height:1.6;}
+
+/* =====================================================
+   RESPONSIBLE AI
+===================================================== */
+.responsible p{color:var(--text-dim);font-size:13px;line-height:1.7;margin:0 0 12px;}
+.responsible p:last-of-type{margin-bottom:0;}
+.sdg-tag{
+  margin-top:16px;display:inline-flex;align-items:center;gap:8px;
+  color:var(--accent);font-size:12.5px;font-weight:600;
+  background:var(--accent-soft);border:1px solid var(--accent-dim);border-radius:20px;padding:7px 14px;
+}
+
+/* =====================================================
+   FOOTER
+===================================================== */
+footer{
+  border-top:1px solid var(--hairline);margin-top:10px;padding:28px 0 40px;
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;
+  color:var(--text-faint);font-size:12px;
+}
+footer .links{display:flex;gap:18px;}
+footer a{color:var(--text-dim);text-decoration:none;}
+footer a:hover{color:var(--intel);}
+
+/* toast */
+#toastHost{position:fixed;bottom:20px;right:20px;z-index:300;display:flex;flex-direction:column;gap:10px;}
+.toast{
+  background:var(--surface-raised);border:1px solid var(--hairline);border-left:3px solid var(--risk-critical);
+  border-radius:var(--radius-sm);padding:12px 16px;font-size:12.5px;color:var(--text);
+  max-width:320px;box-shadow:0 8px 24px rgba(0,0,0,.35);
+  animation:toastIn .25s ease;
+}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+/* =====================================================
+   RESPONSIVE
+===================================================== */
+@media (max-width:1000px){
+  .ledger{grid-template-columns:repeat(2,1fr);}
+  .ledger-cell:nth-child(3){border-left:none;}
+  .chart-grid{grid-template-columns:1fr;}
+  #actionCenter{grid-template-columns:1fr;}
+  .forecast-controls{grid-template-columns:1fr 1fr;}
+  .forecast-controls button{grid-column:1/-1;}
+}
+@media (max-width:640px){
+  .ledger{grid-template-columns:1fr 1fr;}
+  .ledger-cell{border-left:none !important;border-top:1px solid var(--hairline);}
+  .ledger-cell:nth-child(1),.ledger-cell:nth-child(2){border-top:none;}
+  .action-grid{grid-template-columns:1fr 1fr;}
+  .forecast-controls,.forecast-metrics{grid-template-columns:1fr;}
+  .container{width:90%;}
+  .navlinks a{font-size:12px;padding:6px 10px;}
+}
+</style>
+</head>
+<body>
+
+<div id="progressBar"></div>
+<div id="toastHost"></div>
+
+<!-- =====================================================
+     STICKY NAV
+====================================================== -->
+<div class="topbar">
+  <div class="container topbar-inner">
+    <div class="brand-mini"><span class="dot"></span>InventoryWise AI</div>
+    <nav class="navlinks" id="navLinks">
+      <a href="#overview">Overview</a>
+      <a href="#risk">Risk</a>
+      <a href="#actions">Actions</a>
+      <a href="#product">Product</a>
+      <a href="#forecast">Forecast</a>
+      <a href="#batches">Batches</a>
+      <a href="#logic">Logic</a>
+    </nav>
+    <div class="status-pill" id="statusPill"><span class="led"></span><span id="statusText">Checking API…</span></div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- =====================================================
+       HEADER
+  ====================================================== -->
+  <header class="hero" id="overview">
+    <div class="brand">
+      <div class="brand-icon" aria-hidden="true">♻️</div>
+      <div>
+        <h1>InventoryWise AI</h1>
+        <div class="subtitle">AI-Powered Perishable Inventory Waste Prevention System</div>
+        <div class="tagline">Demand forecasting + shelf-life analysis + explainable intervention support</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- =====================================================
+       KPI LEDGER
+  ====================================================== -->
+  <section style="padding:0 0 40px;">
+    <div class="ledger" id="kpiLedger">
+      <div class="ledger-cell">
+        <div class="l-label">Scenario inventory</div>
+        <div class="l-value"><span id="totalInventory">—</span><span class="unit">units</span></div>
+      </div>
+      <div class="ledger-cell">
+        <div class="l-label">Potential surplus</div>
+        <div class="l-value"><span id="potentialSurplus">—</span><span class="unit">units</span></div>
+      </div>
+      <div class="ledger-cell">
+        <div class="l-label">At-risk batches</div>
+        <div class="l-value"><span id="atRiskBatches">—</span></div>
+      </div>
+      <div class="ledger-cell accent-critical">
+        <div class="l-label">Critical / high risk</div>
+        <div class="l-value"><span id="criticalHighRisk">—</span></div>
+      </div>
+      <div class="ledger-cell accent-good">
+        <div class="l-label">Surplus exposure</div>
+        <div class="l-value"><span id="surplusExposure">—</span><span class="unit">%</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       RISK OVERVIEW
+  ====================================================== -->
+  <section class="section" id="risk">
+    <div class="section-head">
+      <h2 class="section-title">
+        Risk overview
+      </h2>
+    </div>
+    <div class="risk-legend">
+      <span><i style="background:var(--risk-critical)"></i>Critical</span>
+      <span><i style="background:var(--risk-high)"></i>High risk</span>
+      <span><i style="background:var(--risk-medium)"></i>Medium risk</span>
+      <span><i style="background:var(--risk-low)"></i>Low risk</span>
+      <span><i style="background:var(--risk-none)"></i>No risk</span>
+    </div>
+    <div class="chart-grid">
+      <div class="panel">
+        <div class="panel-title">SKU waste-risk distribution</div>
+        <div class="panel-subtitle">Simulated inventory batches, grouped by risk level</div>
+        <div id="riskChart" class="chart skeleton"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Potential surplus by SKU</div>
+        <div class="panel-subtitle">Units projected to remain unsold before expiry</div>
+        <div id="surplusChart" class="chart skeleton"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       ACTION CENTER
+  ====================================================== -->
+  <section class="section" id="actions">
+    <div class="section-head">
+      <h2 class="section-title">
+        <span class="section-icon">⚠️</span>
+        Action center
+      </h2>
+    </div>
+    <div class="section-description">Batches that need a human decision, ranked by priority. Filter by risk level to focus on what matters most right now.</div>
+    <div class="chip-row" id="riskFilters"></div>
+    <div id="actionCenter">
+      <div class="empty-state">Loading actions…</div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       PRODUCT ANALYSIS
+  ====================================================== -->
+  <section class="section" id="product">
+    <div class="section-head">
+      <h2 class="section-title">
+        <span class="section-icon">🔎</span>
+        Product analysis
+      </h2>
+    </div>
+    <div class="panel">
+      <div class="select-row">
+        <div>
+          <label for="productSelect">Select product</label>
+          <select id="productSelect"><option>Loading products…</option></select>
+        </div>
+      </div>
+      <div class="ledger product-metrics" id="productMetrics">
+        <div class="ledger-cell metric-box"><div class="l-label">Scenario inventory</div><div class="l-value" id="productInventory">—</div></div>
+        <div class="ledger-cell metric-box"><div class="l-label">Potential surplus</div><div class="l-value" id="productSurplus">—</div></div>
+        <div class="ledger-cell metric-box"><div class="l-label">Shortest shelf life</div><div class="l-value" id="productShelf">—</div></div>
+        <div class="ledger-cell metric-box"><div class="l-label">Risk</div><div class="l-value risk-value" id="productRisk">—</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       AI DEMAND FORECAST
+  ====================================================== -->
+  <section class="section" id="forecast">
+    <div class="section-head">
+      <h2 class="section-title">
+        <span class="section-icon">🤖</span>
+        AI demand forecast
+      </h2>
+    </div>
+    <div class="panel">
+      <div class="forecast-controls">
+        <div>
+          <label for="forecastProduct">Select product</label>
+          <select id="forecastProduct"><option>Loading products…</option></select>
+        </div>
+        <div>
+          <label for="forecastDays">Forecast horizon</label>
+          <select id="forecastDays">
+            <option value="1">1 day</option>
+            <option value="5" selected>5 days</option>
+            <option value="10">10 days</option>
+            <option value="20">20 days</option>
+          </select>
+        </div>
+        <div>
+          <label>Promotion</label>
+          <div class="switch-row">
+            <label class="switch">
+              <input type="checkbox" id="promotionToggle">
+              <span class="track"></span>
+            </label>
+            <span id="promotionLabel" style="font-size:12.5px;color:var(--text-dim);">Off</span>
+          </div>
+        </div>
+        <button id="forecastButton" onclick="generateForecast()">
+          <span class="spinner"></span><span class="btn-label">Generate forecast</span>
+        </button>
+      </div>
+      <div id="forecastStatus" class="forecast-status">
+        <span class="status-dot"></span>
+        <span class="status-text">Current forecast</span>
+      </div>
+      <div class="forecast-metrics">
+        <div class="forecast-stat"><div class="forecast-stat-label">Expected sales</div><div class="forecast-stat-value" id="expectedSales">—</div></div>
+        <div class="forecast-stat"><div class="forecast-stat-label">Average daily forecast</div><div class="forecast-stat-value" id="averageForecast">—</div></div>
+        <div class="forecast-stat"><div class="forecast-stat-label">Peak day</div><div class="forecast-stat-value" id="peakDay">—</div></div>
+      </div>
+      <div id="forecastChart" class="skeleton"></div>
+      <div class="model-note">AI model: Random Forest regression trained on historical FMCG sales, using lagged demand, rolling demand, day-of-week, SKU identity, and promotion status.</div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       BATCH-LEVEL REASONING
+  ====================================================== -->
+  <section class="section" id="batches">
+    <div class="section-head">
+      <h2 class="section-title">
+        Batch-level reasoning
+      </h2>
+    </div>
+    <div class="panel">
+      <div class="panel-subtitle">Every batch behind the selected product's risk score</div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th data-key="batch_id">Batch<span class="arrow"></span></th>
+              <th data-key="sku">SKU<span class="arrow"></span></th>
+              <th data-key="scenario_inventory">Inventory<span class="arrow"></span></th>
+              <th data-key="remaining_shelf_life_days">Shelf life<span class="arrow"></span></th>
+              <th data-key="forecast_daily_demand">Daily forecast<span class="arrow"></span></th>
+              <th data-key="expected_sales_before_expiry">Expected sales<span class="arrow"></span></th>
+              <th data-key="potential_surplus">Surplus<span class="arrow"></span></th>
+              <th data-key="surplus_percentage">Surplus %<span class="arrow"></span></th>
+              <th data-key="waste_risk">Risk<span class="arrow"></span></th>
+              <th data-key="recommended_action">Recommended action<span class="arrow"></span></th>
+            </tr>
+          </thead>
+          <tbody id="batchTable">
+            <tr><td colspan="10">Select a product above to view batch reasoning.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       DECISION LOGIC
+  ====================================================== -->
+  <section class="section" id="logic">
+    <div class="section-head">
+      <h2 class="section-title">
+        How the decision is calculated
+      </h2>
+    </div>
+    <div class="timeline">
+      <div class="timeline-step">
+        <div class="timeline-num">1</div>
+        <div class="timeline-body"><h3>AI demand forecast</h3><p>Random Forest forecasts near-term demand from historical sales patterns, recent demand, day-of-week behaviour, SKU identity, and promotion status.</p></div>
+      </div>
+      <div class="timeline-step">
+        <div class="timeline-num">2</div>
+        <div class="timeline-body"><h3>Expected sales before expiry</h3><p>The forecast is projected across the batch's remaining shelf-life window.</p></div>
+      </div>
+      <div class="timeline-step">
+        <div class="timeline-num">3</div>
+        <div class="timeline-body"><h3>Potential surplus</h3><p>Scenario inventory minus expected sales before expiry. Negative values are treated as zero.</p></div>
+      </div>
+      <div class="timeline-step">
+        <div class="timeline-num">4</div>
+        <div class="timeline-body"><h3>Waste-risk assessment</h3><p>Surplus exposure is weighed together with remaining shelf life to assign a risk level.</p></div>
+      </div>
+      <div class="timeline-step">
+        <div class="timeline-num">5</div>
+        <div class="timeline-body"><h3>Recommended intervention</h3><p>The system surfaces a recommendation for a human inventory manager to review — it never executes an action on its own.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       RESPONSIBLE AI
+  ====================================================== -->
+  <section class="section">
+    <div class="panel responsible">
+      <h2 class="section-title" style="margin-bottom:16px;">
+        <span class="section-icon">ℹ️</span>
+        Prototype scope &amp; responsible AI
+      </h2>
+      <p>InventoryWise AI is a decision-support prototype built on synthetic/public benchmark FMCG sales data.</p>
+      <p>Product shelf life and batch-level inventory exposure are simulated for demonstration, because the source sales dataset doesn't contain reliable batch-level expiry records.</p>
+      <p>The AI component forecasts demand — it does not directly predict food waste. Potential surplus and waste-risk outputs come from combining that forecast with inventory and shelf-life assumptions.</p>
+      <p>Every recommendation is intended for human review before operational use.</p>
+      <div class="sdg-tag">Primary SDG: SDG 12 — Responsible Consumption and Production</div>
+    </div>
+  </section>
+
+  <footer>
+    <div>InventoryWise AI — AI-powered perishable inventory waste prevention</div>
+    <div class="links">
+      <a href="https://github.com/priyanshu-1git/wastewise-ai" target="_blank" rel="noopener">Source</a>
+      <a href="https://wastewise-ai-app.streamlit.app/" target="_blank" rel="noopener">Streamlit demo</a>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+/* =========================================================
+   CONFIG
+========================================================= */
+const API = ""; // same-origin: works locally behind the FastAPI app and on Vercel
+
+/* =========================================================
+   STATE
+========================================================= */
+let currentProductRecords = [];
+let allActions = [];
+let allInventory = [];
+let activeRiskFilter = "all";
+let sortState = { key: null, dir: 1 };
+
+/* =========================================================
+   UI HELPERS
+========================================================= */
+function number(value, decimals = 2) {
+  const n = Number(value);
+  if (Number.isNaN(n)) return "—";
+  return n.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
+function riskKey(risk) {
+  const v = String(risk || "").toLowerCase();
+  if (v.includes("critical")) return "critical";
+  if (v.includes("high")) return "high";
+  if (v.includes("medium")) return "medium";
+  if (v.includes("low")) return "low";
+  return "none";
+}
+
+function riskLabel(risk) {
+  return risk || "No Risk";
+}
+
+function badge(risk) {
+  const key = riskKey(risk);
+  return `<span class="risk-badge ${key}">${riskLabel(risk)}</span>`;
+}
+
+function setProgress(pct) {
+  const bar = document.getElementById("progressBar");
+  bar.style.width = pct + "%";
+  if (pct >= 100) {
+    setTimeout(() => { bar.style.opacity = "0"; }, 300);
+  }
+}
+
+function toast(message) {
+  const host = document.getElementById("toastHost");
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.textContent = message;
+  host.appendChild(el);
+  setTimeout(() => el.remove(), 5200);
+}
+
+function countUp(id, target, decimals = 0, duration = 700) {
+  const el = document.getElementById(id);
+  const start = 0;
+  const startTime = performance.now();
+  function step(now) {
+    const progress = Math.min(1, (now - startTime) / duration);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const value = start + (target - start) * eased;
+    el.textContent = number(value, decimals);
+    if (progress < 1) requestAnimationFrame(step);
+    else el.textContent = number(target, decimals);
+  }
+  requestAnimationFrame(step);
+}
+
+async function apiGet(path) {
+  const response = await fetch(API + path);
+  if (!response.ok) {
+    let detail = response.statusText;
+    try { detail = (await response.json()).error || detail; } catch (e) {}
+    throw new Error(`${path} → ${response.status} ${detail}`);
+  }
+  return response.json();
+}
+
+function darkChartLayout(yTitle, xTitle) {
+  return {
+    paper_bgcolor: "rgba(0,0,0,0)",
+    plot_bgcolor: "rgba(0,0,0,0)",
+    margin: { l: 55, r: 20, t: 10, b: 60 },
+    font: { color: "#9db3a9", size: 11, family: "Inter, sans-serif" },
+    xaxis: { title: xTitle, gridcolor: "#20342c", zerolinecolor: "#20342c" },
+    yaxis: { title: yTitle, gridcolor: "#20342c", zerolinecolor: "#20342c" }
+  };
+}
+
+/* =========================================================
+   API HEALTH
+========================================================= */
+async function checkHealth() {
+  const pill = document.getElementById("statusPill");
+  const text = document.getElementById("statusText");
+  try {
+    await apiGet("/api/health");
+    pill.className = "status-pill online";
+    text.textContent = "API online";
+  } catch (e) {
+    pill.className = "status-pill offline";
+    text.textContent = "API unreachable";
+  }
+}
+
+/* =========================================================
+   SUMMARY
+========================================================= */
+async function loadSummary() {
+  const data = await apiGet("/api/summary");
+  countUp("totalInventory", data.total_inventory, 0);
+  countUp("potentialSurplus", data.potential_surplus, 2);
+  countUp("atRiskBatches", data.at_risk_batches, 0);
+  countUp("criticalHighRisk", data.critical_high_risk, 0);
+  countUp("surplusExposure", data.surplus_exposure, 2);
+}
+
+/* =========================================================
+   PRODUCTS
+========================================================= */
+async function loadProducts() {
+  const products = await apiGet("/api/products");
+  const productSelect = document.getElementById("productSelect");
+  const forecastProduct = document.getElementById("forecastProduct");
+  productSelect.innerHTML = "";
+  forecastProduct.innerHTML = "";
+
+  products.forEach(product => {
+    for (const select of [productSelect, forecastProduct]) {
+      const opt = document.createElement("option");
+      opt.value = product.sku;
+      opt.textContent = product.name;
+      select.appendChild(opt);
+    }
+  });
+
+  // RE-004 is the default product because it is the project's critical-risk scenario.
+  const defaultSku = products.some(p => p.sku === "RE-004") ? "RE-004" : (products[0] && products[0].sku);
+  if (defaultSku) {
+    productSelect.value = defaultSku;
+    forecastProduct.value = defaultSku;
+  }
+  await loadProduct(productSelect.value);
+}
+
+/* =========================================================
+   ACTION CENTER
+========================================================= */
+function buildRiskFilters() {
+  const counts = { all: allActions.length, critical: 0, high: 0, medium: 0, low: 0, none: 0 };
+  allActions.forEach(a => { counts[riskKey(resolveActionRisk(a))]++; });
+
+  const labels = [
+    ["all", "All"], ["critical", "Critical"], ["high", "High risk"],
+    ["medium", "Medium risk"], ["low", "Low risk"], ["none", "No risk"]
+  ];
+  const host = document.getElementById("riskFilters");
+  host.innerHTML = "";
+  labels.forEach(([key, label]) => {
+    if (key !== "all" && !counts[key]) return;
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip" + (activeRiskFilter === key ? " active" : "");
+    chip.innerHTML = `${label}<span class="count">${counts[key]}</span>`;
+    chip.onclick = () => { activeRiskFilter = key; renderActions(); buildRiskFilters(); };
+    host.appendChild(chip);
+  });
+}
+
+function resolveActionRisk(action) {
+  const matching = allInventory.filter(row => row.sku === action.sku);
+  return action.waste_risk || (matching.find(r => r.waste_risk) || {}).waste_risk || "Medium Risk";
+}
+
+function renderActions() {
+  const container = document.getElementById("actionCenter");
+  container.innerHTML = "";
+
+  let filtered = allActions.filter(a => activeRiskFilter === "all" || riskKey(resolveActionRisk(a)) === activeRiskFilter);
+
+  if (!filtered.length) {
+    container.innerHTML = `<div class="empty-state">No actions match this filter — everything else is within safe shelf-life margins.</div>`;
+    return;
+  }
+
+  filtered
+    .map(action => {
+      const sku = action.sku || "—";
+      const matchingRows = allInventory.filter(row => row.sku === sku);
+      const scenarioInventory = matchingRows.reduce((s, r) => s + Number(r.scenario_inventory || 0), 0);
+      const potentialSurplus = matchingRows.reduce((s, r) => s + Number(r.potential_surplus || 0), 0);
+      const shelfLives = matchingRows.map(r => Number(r.remaining_shelf_life_days || 0));
+      const shelfLife = shelfLives.length ? Math.min(...shelfLives) : 0;
+      const priority = matchingRows.length ? Math.max(...matchingRows.map(r => Number(r.priority_score || 0))) : 0;
+      const risk = resolveActionRisk(action);
+      const category = action.category || (matchingRows[0] || {}).category || "";
+      const recommendation = action.recommended_action || action.action || action.recommendation ||
+        (matchingRows.find(r => r.recommended_action) || {}).recommended_action || "Review inventory";
+      return { sku, category, scenarioInventory, potentialSurplus, shelfLife, priority, risk, recommendation };
+    })
+    .sort((a, b) => b.priority - a.priority)
+    .forEach(a => {
+      const card = document.createElement("div");
+      card.className = "action-card " + (riskKey(a.risk) === "none" ? "low" : riskKey(a.risk));
+      card.innerHTML = `
+        <div class="action-title">
+          <span>${a.category ? a.category + " — " : ""}<span class="sku-code">${a.sku}</span></span>
+          ${badge(a.risk)}
+        </div>
+        <div class="action-grid">
+          <div><div class="action-metric-label">Scenario inventory</div><div class="action-metric-value">${number(a.scenarioInventory, 0)}</div></div>
+          <div><div class="action-metric-label">Potential surplus</div><div class="action-metric-value">${number(a.potentialSurplus)}</div></div>
+          <div><div class="action-metric-label">Shelf life</div><div class="action-metric-value">${a.shelfLife} day(s)</div></div>
+          <div><div class="action-metric-label">Priority</div><div class="action-metric-value">${number(a.priority)}</div></div>
+        </div>
+        <div class="action-recommendation">Recommended action: ${a.recommendation}</div>
+      `;
+      container.appendChild(card);
+    });
+}
+
+async function loadActions() {
+  const container = document.getElementById("actionCenter");
+  try {
+    const [actions, inventory] = await Promise.all([apiGet("/api/actions"), apiGet("/api/inventory")]);
+    allActions = actions;
+    allInventory = inventory;
+    if (!allActions.length) {
+      container.innerHTML = `<div class="empty-state">No actions needed right now — everything is within safe shelf-life margins.</div>`;
+      document.getElementById("riskFilters").innerHTML = "";
+      return;
+    }
+    buildRiskFilters();
+    renderActions();
+  } catch (e) {
+    container.innerHTML = `<div class="error-state">Couldn't load the action center: ${e.message}</div>`;
+    throw e;
+  }
+}
+
+/* =========================================================
+   RISK + SURPLUS CHARTS
+========================================================= */
+async function loadRiskChart() {
+  const el = document.getElementById("riskChart");
+  try {
+    const data = await apiGet("/api/risk-overview");
+    const distribution = data.risk_distribution;
+    const order = [
+      ["Critical", "#e8566b"],
+      ["High Risk", "#e0913f"],
+      ["Medium Risk", "#d9b64e"],
+      ["Low Risk", "#63a9d6"],
+      ["No Risk", "#4fbf8b"]
+    ];
+    const labels = order.map(o => o[0]);
+    const colors = order.map(o => o[1]);
+    const values = labels.map(risk => distribution[risk] || 0);
+    el.classList.remove("skeleton");
+    Plotly.newPlot(el, [{
+      x: labels, y: values, type: "bar",
+      marker: { color: colors }
+    }], darkChartLayout("SKU count", "Risk level"), { responsive: true, displayModeBar: false });
+  } catch (e) {
+    el.classList.remove("skeleton");
+    el.innerHTML = `<div class="error-state">Couldn't load risk data: ${e.message}</div>`;
+    throw e;
+  }
+}
+
+async function loadSurplusChart() {
+  const el = document.getElementById("surplusChart");
+  try {
+    const data = await apiGet("/api/surplus-overview");
+    const positive = data.filter(item => Number(item.potential_surplus) > 0);
+    el.classList.remove("skeleton");
+    Plotly.newPlot(el, [{
+      x: positive.map(item => `${item.category} — ${item.sku}`),
+      y: positive.map(item => Number(item.potential_surplus)),
+      type: "bar",
+      marker: { color: "#63a9d6" }
+    }], darkChartLayout("Potential surplus", "Product"), { responsive: true, displayModeBar: false });
+  } catch (e) {
+    el.classList.remove("skeleton");
+    el.innerHTML = `<div class="error-state">Couldn't load surplus data: ${e.message}</div>`;
+    throw e;
+  }
+}
+
+/* =========================================================
+   PRODUCT ANALYSIS
+========================================================= */
+async function loadProduct(sku) {
+  if (!sku) return;
+  try {
+    const data = await apiGet(`/api/product/${sku}`);
+    currentProductRecords = data.records || [];
+    if (!currentProductRecords.length) return;
+
+    const inventory = currentProductRecords.reduce((s, r) => s + Number(r.scenario_inventory || 0), 0);
+    const surplus = currentProductRecords.reduce((s, r) => s + Number(r.potential_surplus || 0), 0);
+    const shelfValues = currentProductRecords.map(r => Number(r.remaining_shelf_life_days || 0));
+    const shortestShelf = Math.min(...shelfValues);
+    const risk = currentProductRecords.map(r => r.waste_risk).find(r => r === "Critical")
+      || currentProductRecords[0].waste_risk || "No Risk";
+
+    document.getElementById("productInventory").textContent = number(inventory, 0);
+    document.getElementById("productSurplus").textContent = number(surplus);
+    document.getElementById("productShelf").textContent = `${shortestShelf} day(s)`;
+    const riskEl = document.getElementById("productRisk");
+    riskEl.textContent = risk;
+    riskEl.className = "l-value risk-value risk-" + riskKey(risk);
+
+    renderBatchTable(currentProductRecords);
+  } catch (e) {
+    toast(`Couldn't load ${sku}: ${e.message}`);
+  }
+}
+
+/* =========================================================
+   BATCH TABLE (sortable)
+========================================================= */
+function renderBatchTable(records) {
+  let rows = records;
+
+  if (sortState.key) {
+    rows = [...rows].sort((a, b) => {
+      const av = a[sortState.key], bv = b[sortState.key];
+      const an = Number(av), bn = Number(bv);
+      const cmp = (!Number.isNaN(an) && !Number.isNaN(bn) && av !== "" && bv !== "")
+        ? an - bn
+        : String(av || "").localeCompare(String(bv || ""));
+      return cmp * sortState.dir;
+    });
+  }
+
+  const tbody = document.getElementById("batchTable");
+  tbody.innerHTML = "";
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="10">No batch data for this product.</td></tr>`;
+    return;
+  }
+
+  rows.forEach(row => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="sku-code">${row.batch_id ?? "—"}</td>
+      <td class="sku-code">${row.sku ?? "—"}</td>
+      <td>${number(row.scenario_inventory, 0)}</td>
+      <td>${row.remaining_shelf_life_days ?? "—"} d</td>
+      <td>${number(row.forecast_daily_demand)}</td>
+      <td>${number(row.expected_sales_before_expiry)}</td>
+      <td>${number(row.potential_surplus)}</td>
+      <td>${number(row.surplus_percentage)}%</td>
+      <td>${badge(row.waste_risk)}</td>
+      <td>${row.recommended_action ?? "—"}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+document.querySelectorAll("#batches th[data-key]").forEach(th => {
+  th.addEventListener("click", () => {
+    const key = th.dataset.key;
+    sortState.dir = (sortState.key === key) ? sortState.dir * -1 : 1;
+    sortState.key = key;
+    document.querySelectorAll("#batches th .arrow").forEach(a => a.textContent = "");
+    th.querySelector(".arrow").textContent = sortState.dir === 1 ? "↑" : "↓";
+    renderBatchTable(currentProductRecords);
+  });
+});
+
+// The current UI has no #batchFilter element.
+    // Do not bind an event listener to a missing element, otherwise the
+    // JavaScript stops here and the API initialization never runs.
+
+/* =========================================================
+   FORECAST
+========================================================= */
+function setForecastStale() {
+  const button = document.getElementById("forecastButton");
+  const chartEl = document.getElementById("forecastChart");
+  const status = document.getElementById("forecastStatus");
+  if (!button || !chartEl || !status) return;
+
+  button.classList.add("needs-refresh");
+  button.querySelector(".btn-label").textContent = "Generate new forecast";
+
+  chartEl.classList.add("forecast-stale");
+
+  status.classList.add("stale");
+  status.querySelector(".status-text").textContent =
+    "New product selected — click Generate new forecast to update the graph.";
+}
+
+function setForecastCurrent() {
+  const button = document.getElementById("forecastButton");
+  const chartEl = document.getElementById("forecastChart");
+  const status = document.getElementById("forecastStatus");
+  if (!button || !chartEl || !status) return;
+
+  button.classList.remove("needs-refresh");
+  button.querySelector(".btn-label").textContent = "Generate forecast";
+
+  chartEl.classList.remove("forecast-stale");
+
+  status.classList.remove("stale");
+  status.querySelector(".status-text").textContent = "Current forecast";
+}
+
+async function generateForecast() {
+  const sku = document.getElementById("forecastProduct").value;
+  const days = document.getElementById("forecastDays").value;
+  const promotion = document.getElementById("promotionToggle").checked ? 1 : 0;
+  if (!sku) return;
+
+  const button = document.getElementById("forecastButton");
+  const chartEl = document.getElementById("forecastChart");
+  button.disabled = true;
+  button.classList.add("loading");
+  button.classList.remove("needs-refresh");
+  button.querySelector(".btn-label").textContent = "Generating…";
+  chartEl.classList.add("skeleton");
+
+  try {
+    const data = await apiGet(`/api/forecast/${sku}?days=${days}&promotion_flag=${promotion}`);
+    const values = data.forecast.map(item => Number(item.predicted_demand));
+    const total = values.reduce((a, b) => a + b, 0);
+    const average = values.length ? total / values.length : 0;
+    const peakIndex = values.indexOf(Math.max(...values));
+
+    document.getElementById("expectedSales").textContent = number(total) + " units";
+    document.getElementById("averageForecast").textContent = number(average) + " units/day";
+    document.getElementById("peakDay").textContent = values.length
+      ? `${data.forecast[peakIndex].date} (${number(values[peakIndex], 0)})`
+      : "—";
+
+  chartEl.classList.remove("skeleton");
+
+const forecastLayout = darkChartLayout(
+  "Random Forest Predicted Daily Demand",
+  "Date"
+);
+
+forecastLayout.hovermode = "x unified";
+
+forecastLayout.xaxis = {
+  ...forecastLayout.xaxis,
+  tickmode: "auto",
+  nticks: Math.min(data.forecast.length, 10)
+};
+
+forecastLayout.yaxis = {
+  ...forecastLayout.yaxis,
+  title: "predicted_demand"
+};
+
+Plotly.newPlot(chartEl, [{
+  x: data.forecast.map(item => item.date),
+  y: values,
+  type: "scatter",
+  mode: "lines+markers",
+
+  line: {
+    color: "#63a9d6",
+    width: 2.5,
+    shape: "linear"
+  },
+
+  marker: {
+    color: "#63a9d6",
+    size: 6
+  }
+}], forecastLayout, {
+  responsive: true,
+  displayModeBar: false
+});
+
+    setForecastCurrent();
+
+  } catch (e) {
+    chartEl.classList.remove("skeleton");
+    chartEl.innerHTML = `<div class="error-state">Couldn't generate a forecast: ${e.message}</div>`;
+    toast(`Forecast failed for ${sku}`);
+  } finally {
+    button.disabled = false;
+    button.classList.remove("loading");
+    if (!button.classList.contains("needs-refresh")) {
+      button.querySelector(".btn-label").textContent = "Generate forecast";
+    }
+  }
+}
+/* =========================================================
+   EVENT LISTENERS
+========================================================= */
+document.getElementById("productSelect").addEventListener("change", function () {
+  // Product Analysis remains independent from the forecast selection.
+  loadProduct(this.value);
+});
+
+document.getElementById("forecastProduct").addEventListener("change", function () {
+  // Forecast product drives Product Analysis, but not the other way around.
+  document.getElementById("productSelect").value = this.value;
+  loadProduct(this.value);
+
+  // Keep the previous graph visible but clearly mark it as stale.
+  setForecastStale();
+});
+
+document.getElementById("forecastDays").addEventListener("change", function () {
+  // Horizon changes automatically regenerate the current forecast.
+  generateForecast();
+});
+
+document.getElementById("promotionToggle").addEventListener("change", function () {
+  document.getElementById("promotionLabel").textContent = this.checked ? "On" : "Off";
+
+  // Promotion is also a forecast input, so regenerate automatically.
+  generateForecast();
+});
+
+/* =========================================================
+   NAVIGATION ACTIVE STATE
+========================================================= */
+
+const navAnchors = [...document.querySelectorAll(".navlinks a")];
+
+const navSections = navAnchors
+  .map(anchor => ({
+    anchor,
+    section: document.querySelector(anchor.getAttribute("href"))
+  }))
+  .filter(item => item.section);
+
+let navClickLock = false;
+let navUnlockTimer = null;
+
+function setActiveNav(sectionId) {
+  navAnchors.forEach(anchor => {
+    anchor.classList.toggle(
+      "active",
+      anchor.getAttribute("href") === "#" + sectionId
+    );
+  });
+}
+
+/* ---------------------------------------------------------
+   CLICK NAVIGATION
+   Highlight the clicked section immediately.
+--------------------------------------------------------- */
+
+navAnchors.forEach(anchor => {
+  anchor.addEventListener("click", () => {
+    const targetId = anchor.getAttribute("href").substring(1);
+
+    /* Immediately highlight what the user clicked */
+    setActiveNav(targetId);
+
+    /*
+      Prevent the scroll-spy from changing the highlight
+      while smooth scrolling is taking place.
+    */
+    navClickLock = true;
+
+    clearTimeout(navUnlockTimer);
+
+    navUnlockTimer = setTimeout(() => {
+      navClickLock = false;
+      setActiveNav(targetId);
+    }, 900);
+  });
+});
+
+/* ---------------------------------------------------------
+   SCROLL-SPY
+   Only updates the highlight when the user is manually
+   scrolling, not while navigation is being clicked.
+--------------------------------------------------------- */
+
+function updateActiveNav() {
+  if (navClickLock) return;
+
+  const navHeight =
+    document.querySelector(".topbar")?.offsetHeight || 70;
+
+  const position = window.scrollY + navHeight + 100;
+
+  let activeSection = navSections[0]?.section;
+
+  for (const item of navSections) {
+    if (item.section.offsetTop <= position) {
+      activeSection = item.section;
+    }
+  }
+
+  if (activeSection) {
+    setActiveNav(activeSection.id);
+  }
+}
+
+window.addEventListener(
+  "scroll",
+  updateActiveNav,
+  { passive: true }
+);
+
+/* ---------------------------------------------------------
+   INITIAL STATE
+--------------------------------------------------------- */
+
+setActiveNav("overview");
+updateActiveNav();
+
+/* =========================================================
+   INITIAL LOAD
+========================================================= */
+async function initialize() {
+  checkHealth();
+  setProgress(10);
+  try {
+    await loadSummary();       setProgress(35);
+    await loadProducts();      setProgress(55);
+    await loadActions();       setProgress(70);
+    await loadRiskChart();     setProgress(82);
+    await loadSurplusChart();  setProgress(92);
+    await generateForecast();  setProgress(100);
+  } catch (error) {
+    console.error("Initialization error:", error);
+    toast("Some panels failed to load — check the API connection.");
+    setProgress(100);
+  }
+}
+initialize();
+</script>
+</body>
+</html>
