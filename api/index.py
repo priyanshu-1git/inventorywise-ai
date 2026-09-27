@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import os
 import pandas as pd
@@ -102,11 +103,9 @@ def product_label(sku):
 
 @app.get("/")
 def root():
-    return {
-        "name": "InventoryWise AI",
-        "description": "AI-Powered Perishable Inventory Waste Prevention System",
-        "status": "online"
-    }
+    return FileResponse(
+        os.path.join(BASE_DIR, "static", "index.html")
+    )
 
 
 # =========================================================
