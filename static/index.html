@@ -1360,19 +1360,28 @@ updateActiveNav();
 async function initialize() {
   checkHealth();
   setProgress(10);
+
   try {
-    await loadSummary();       setProgress(35);
-    await loadProducts();      setProgress(55);
-    await loadActions();       setProgress(70);
-    await loadRiskChart();     setProgress(82);
-    await loadSurplusChart();  setProgress(92);
-    await generateForecast();  setProgress(100);
+    await Promise.all([
+      loadSummary(),
+      loadProducts(),
+      loadActions(),
+      loadRiskChart(),
+      loadSurplusChart()
+    ]);
+
+    setProgress(92);
+
+    await generateForecast();
+
+    setProgress(100);
   } catch (error) {
     console.error("Initialization error:", error);
     toast("Some panels failed to load — check the API connection.");
     setProgress(100);
   }
 }
+
 initialize();
 </script>
 </body>
