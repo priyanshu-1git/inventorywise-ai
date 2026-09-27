@@ -15,15 +15,15 @@
    DESIGN TOKENS
 ===================================================== */
 :root{
-  --bg:#0a1512;
-  --bg-alt:#0d1a16;
-  --surface:#11201c;
-  --surface-raised:#152922;
-  --hairline:#20342c;
-  --hairline-soft:#182821;
-  --text:#eef4f1;
-  --text-dim:#9db3a9;
-  --text-faint:#5c7268;
+  --bg:#0b0d10;
+  --bg-alt:#0e1114;
+  --surface:#14171b;
+  --surface-raised:#191d22;
+  --hairline:#272b31;
+  --hairline-soft:#1d2126;
+  --text:#eef0f2;
+  --text-dim:#9ba2ac;
+  --text-faint:#63696f;
 
   --accent:#4fbf8b;       /* sustainability / primary action */
   --accent-dim:#376b52;
@@ -53,8 +53,8 @@ html{scroll-behavior:smooth;scroll-padding-top:76px;}
 body{
   margin:0;
   background:
-    radial-gradient(ellipse 1100px 500px at 15% -10%, rgba(79,191,139,.08), transparent 60%),
-    radial-gradient(ellipse 900px 500px at 100% 0%, rgba(99,169,214,.06), transparent 55%),
+    radial-gradient(ellipse 1100px 500px at 15% -10%, rgba(120,128,138,.05), transparent 60%),
+    radial-gradient(ellipse 900px 500px at 100% 0%, rgba(99,169,214,.05), transparent 55%),
     var(--bg);
   color:var(--text);
   font-family:var(--font-body);
@@ -79,7 +79,7 @@ a{color:var(--intel);}
 ===================================================== */
 .topbar{
   position:sticky;top:0;z-index:100;
-  background:rgba(10,21,18,.86);
+  background:rgba(11,13,16,.86);
   backdrop-filter:blur(10px);
   border-bottom:1px solid var(--hairline);
 }
@@ -100,13 +100,6 @@ a{color:var(--intel);}
 }
 .navlinks a:hover{color:var(--text);background:var(--surface);}
 .navlinks a.active{color:var(--bg);background:var(--accent);font-weight:600;}
-.status-pill{
-  display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-dim);
-  padding:6px 11px;border:1px solid var(--hairline);border-radius:20px;white-space:nowrap;
-}
-.status-pill .led{width:7px;height:7px;border-radius:50%;background:var(--text-faint);transition:background .3s ease;}
-.status-pill.online .led{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
-.status-pill.offline .led{background:var(--risk-critical);box-shadow:0 0 0 3px rgba(232,86,107,.15);}
 
 /* =====================================================
    HEADER
@@ -372,7 +365,7 @@ th:hover{color:var(--text);}
 th .arrow{opacity:.4;margin-left:4px;font-size:10px;}
 th,td{padding:11px 12px;border-bottom:1px solid var(--hairline);white-space:nowrap;}
 tbody tr:hover{background:var(--surface-raised);}
-td{color:#c7d3cd;}
+td{color:#cdd1d5;}
 td.sku-code{font-family:var(--font-mono);color:var(--text-dim);}
 
 /* =====================================================
@@ -427,22 +420,48 @@ footer a:hover{color:var(--intel);}
 /* =====================================================
    RESPONSIVE
 ===================================================== */
+/* Tablet */
 @media (max-width:1000px){
   .ledger{grid-template-columns:repeat(2,1fr);}
   .ledger-cell:nth-child(3){border-left:none;}
+  .ledger-cell:nth-child(odd){border-left:none;}
   .chart-grid{grid-template-columns:1fr;}
   #actionCenter{grid-template-columns:1fr;}
   .forecast-controls{grid-template-columns:1fr 1fr;}
   .forecast-controls button{grid-column:1/-1;}
+  .action-grid{grid-template-columns:repeat(2,1fr);}
+  .container{width:94%;}
 }
+/* Small tablet / large phone */
+@media (max-width:768px){
+  header.hero{padding:34px 0 22px;}
+  .section{padding:32px 0;}
+  .topbar-inner{padding:11px 0;gap:12px;}
+  .brand-mini{font-size:14px;}
+  .navlinks a{font-size:12.5px;padding:6px 10px;}
+  .forecast-metrics{grid-template-columns:repeat(2,1fr)!important;}
+}
+/* Phone */
 @media (max-width:640px){
   .ledger{grid-template-columns:1fr 1fr;}
   .ledger-cell{border-left:none !important;border-top:1px solid var(--hairline);}
   .ledger-cell:nth-child(1),.ledger-cell:nth-child(2){border-top:none;}
   .action-grid{grid-template-columns:1fr 1fr;}
-  .forecast-controls,.forecast-metrics{grid-template-columns:1fr;}
-  .container{width:90%;}
+  .forecast-controls,.forecast-metrics{grid-template-columns:1fr!important;}
+  .container{width:92%;}
   .navlinks a{font-size:12px;padding:6px 10px;}
+  .topbar-inner{flex-wrap:wrap;justify-content:center;padding:10px 0;}
+  .brand-mini{width:100%;justify-content:center;}
+  .navlinks{width:100%;justify-content:flex-start;}
+  .section-head{flex-direction:column;align-items:flex-start;}
+}
+/* Very small phone */
+@media (max-width:400px){
+  .ledger{grid-template-columns:1fr;}
+  .ledger-cell{border-left:none !important;border-top:1px solid var(--hairline);}
+  .ledger-cell:first-child{border-top:none;}
+  .action-grid{grid-template-columns:1fr;}
+  .brand h1{font-size:22px;}
 }
 </style>
 </head>
@@ -466,7 +485,6 @@ footer a:hover{color:var(--intel);}
       <a href="#batches">Batches</a>
       <a href="#logic">Logic</a>
     </nav>
-    <div class="status-pill" id="statusPill"><span class="led"></span><span id="statusText">Checking API…</span></div>
   </div>
 </div>
 
@@ -725,14 +743,6 @@ footer a:hover{color:var(--intel);}
     </div>
   </section>
 
-  <footer>
-    <div>InventoryWise AI — AI-powered perishable inventory waste prevention</div>
-    <div class="links">
-      <a href="https://github.com/priyanshu-1git/wastewise-ai" target="_blank" rel="noopener">Source</a>
-      <a href="https://wastewise-ai-app.streamlit.app/" target="_blank" rel="noopener">Streamlit demo</a>
-    </div>
-  </footer>
-
 </div>
 
 <script>
@@ -828,22 +838,6 @@ function darkChartLayout(yTitle, xTitle) {
     xaxis: { title: xTitle, gridcolor: "#20342c", zerolinecolor: "#20342c" },
     yaxis: { title: yTitle, gridcolor: "#20342c", zerolinecolor: "#20342c" }
   };
-}
-
-/* =========================================================
-   API HEALTH
-========================================================= */
-async function checkHealth() {
-  const pill = document.getElementById("statusPill");
-  const text = document.getElementById("statusText");
-  try {
-    await apiGet("/api/health");
-    pill.className = "status-pill online";
-    text.textContent = "API online";
-  } catch (e) {
-    pill.className = "status-pill offline";
-    text.textContent = "API unreachable";
-  }
 }
 
 /* =========================================================
@@ -1358,7 +1352,6 @@ updateActiveNav();
    INITIAL LOAD
 ========================================================= */
 async function initialize() {
-  checkHealth();
   setProgress(10);
 
   try {
